@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
  */
 object AppLogger {
     private const val MASTER_TAG = "NateTV"
-    private const val MAX_ON_SCREEN_LOGS = 50
+    private const val MAX_ON_SCREEN_LOGS = 200
     private val logQueue = ConcurrentLinkedQueue<String>()
     private val _liveLogs = MutableStateFlow<List<String>>(emptyList())
     val liveLogs: StateFlow<List<String>> = _liveLogs.asStateFlow()

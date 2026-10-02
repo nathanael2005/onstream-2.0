@@ -96,9 +96,9 @@ class WebViewStreamExtractor(
                 embedUrl = if (isTv) "https://vidsrc.to/embed/tv/$tmdbId/$s/$ep" else "https://vidsrc.to/embed/movie/$tmdbId"
             ),
             EmbedCandidate(
-                serverId = "vidsrc_in",
-                serverName = "VidSrc Pro",
-                embedUrl = if (isTv) "https://vidsrc.in/embed/tv/$tmdbId/$s/$ep" else "https://vidsrc.in/embed/movie/$tmdbId"
+                serverId = "vidsrc_pm",
+                serverName = "VidSrc PM",
+                embedUrl = if (isTv) "https://vidsrc.pm/embed/tv/$tmdbId/$s/$ep" else "https://vidsrc.pm/embed/movie/$tmdbId"
             ),
             EmbedCandidate(
                 serverId = "videasy_to",
@@ -218,6 +218,34 @@ class WebViewStreamExtractor(
 
             nonNullWv.webViewClient = createWebViewClient()
 
+            nonNullWv.webChromeClient = object : android.webkit.WebChromeClient() {
+                override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
+                    consoleMessage?.let {
+                        val msg = it.message()
+                        val level = it.messageLevel()
+                        val src = it.sourceId()?.substringAfterLast('/') ?: "js"
+                        val line = it.lineNumber()
+                        if (level == android.webkit.ConsoleMessage.MessageLevel.ERROR) {
+                            AppLogger.web("🚨 JS Error: $msg ($src:$line)")
+                        } else if (level == android.webkit.ConsoleMessage.MessageLevel.WARNING) {
+                            AppLogger.web("⚠️ JS Warn: $msg ($src:$line)")
+                        } else if (msg.contains("player", true) || msg.contains("stream", true) ||
+                            msg.contains("m3u8", true) || msg.contains("source", true) ||
+                            msg.contains("vs", true) || msg.contains("token", true)
+                        ) {
+                            AppLogger.web("💬 JS: $msg ($src:$line)")
+                        }
+                    }
+                    return true
+                }
+
+                override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                    if (newProgress == 100) {
+                        AppLogger.web("📄 Page DOM 100% loaded")
+                    }
+                }
+            }
+
             this.webView = nonNullWv
             onWebViewCreated?.invoke(nonNullWv)
 
@@ -325,6 +353,13 @@ class WebViewStreamExtractor(
                 }
 
                 if (isAdOrMiner(url)) {
+                    if (lower.contains("disable-devtool") || lower.contains("devtools-detector")) {
+                        return WebResourceResponse(
+                            "application/javascript",
+                            "UTF-8",
+                            ByteArrayInputStream("window.DisableDevtool=function(){return {isDevTool:false}};window.disableDevtool=window.DisableDevtool;".toByteArray(Charsets.UTF_8))
+                        )
+                    }
                     return emptyResponse()
                 }
 
@@ -339,7 +374,7 @@ class WebViewStreamExtractor(
                 }
 
                 // Rewrite embed/landing pages to force autoStart & autoplay without requiring a click
-                if (lower.contains("cloudorchestranova.com") || lower.contains("landing") ||
+                if (lower.contains("orchestranova") || lower.contains("landing") ||
                     lower.contains("vsembed") || lower.contains("vidsrc") ||
                     lower.contains("/embed/tv/") || lower.contains("/embed/movie/")
                 ) {
@@ -900,7 +935,7 @@ class WebViewStreamExtractor(
         return lower.contains("videasy") || lower.contains("vidlink") ||
                 lower.contains("vidsrc") || lower.contains("2embed") ||
                 lower.contains("multiembed") || lower.contains("streamingnow") ||
-                lower.contains("vsembed") || lower.contains("cloudorchestranova") ||
+                lower.contains("vsembed") || lower.contains("orchestranova") ||
                 lower.contains("autoembed") || lower.contains("jongleurjamboree") ||
                 lower.contains("nextgencloudfabric") || lower.contains("sharecloud") ||
                 lower.contains("hakunaymatata") || lower.contains("bunnycdn") || lower.contains("cloudfront") ||
@@ -971,8 +1006,20 @@ class WebViewStreamExtractor(
                         window.alert = function() {};
                         window.confirm = function() { return true; };
                         window.prompt = function() { return null; };
-                        window.DisableDevtool = function() {};
-                        window.disableDevtool = function() {};
+                        window.DisableDevtool = function() { return { isDevTool: false }; };
+                        window.disableDevtool = window.DisableDevtool;
+                        var origReplace = window.location.replace;
+                        window.location.replace = function(u) {
+                            if (typeof u === 'string' && (u.indexOf('about:blank') !== -1 || u.indexOf('about:') !== -1)) {
+                                return;
+                            }
+                            return origReplace.apply(this, arguments);
+                        };
+                        window.addEventListener('message', function(ev) {
+                            if (ev.data && (ev.data.type === 'VS_DEVTOOLS' || ev.data === 'VS_DEVTOOLS')) {
+                                try { ev.stopImmediatePropagation(); } catch(e) {}
+                            }
+                        }, true);
                     } catch(e) {}
 
                     // Helper to recursively extract subtitles from JSON/JS objects

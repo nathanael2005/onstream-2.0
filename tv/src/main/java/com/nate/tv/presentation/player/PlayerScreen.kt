@@ -471,8 +471,8 @@ fun PlayerScreen(
                             LiveDebugTerminal(
                                 logs = liveLogs,
                                 modifier = Modifier
-                                    .fillMaxWidth(0.92f)
-                                    .height(180.dp)
+                                    .fillMaxWidth(0.95f)
+                                    .height(250.dp)
                             )
                         }
                     }
@@ -1283,8 +1283,8 @@ fun PlayerScreen(
                             LiveDebugTerminal(
                                 logs = liveLogs,
                                 modifier = Modifier
-                                    .fillMaxWidth(0.92f)
-                                    .height(180.dp)
+                                    .fillMaxWidth(0.95f)
+                                    .height(250.dp)
                             )
                         }
                     }
@@ -1365,11 +1365,13 @@ private fun LiveDebugTerminal(
             ) {
                 items(logs) { log ->
                     val color = when {
-                        log.contains("❌") || log.contains("Error", ignoreCase = true) || log.contains("failed", ignoreCase = true) -> Color(0xFFF87171)
-                        log.contains("⚠️") || log.contains("Warning", ignoreCase = true) -> Color(0xFFFBBF24)
+                        log.contains("❌") || log.contains("🚨") || log.contains("Error", ignoreCase = true) || log.contains("failed", ignoreCase = true) -> Color(0xFFF87171)
+                        log.contains("⚠️") || log.contains("Warn", ignoreCase = true) -> Color(0xFFFBBF24)
                         log.contains("🎬") || log.contains("Ready", ignoreCase = true) || log.contains("Success", ignoreCase = true) -> Color(0xFF4ADE80)
                         log.contains("⚡") -> Color(0xFF60A5FA)
-                        log.contains("🌐") || log.contains("http", ignoreCase = true) -> Color(0xFF38BDF8)
+                        log.contains("🛡️") -> Color(0xFFA78BFA)
+                        log.contains("💬") -> Color(0xFFF472B6)
+                        log.contains("🌐") || log.contains("🕸️") || log.contains("http", ignoreCase = true) -> Color(0xFF38BDF8)
                         else -> Color(0xFFCBD5E1)
                     }
                     Text(
