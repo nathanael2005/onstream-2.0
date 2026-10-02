@@ -29,7 +29,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -47,6 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onKeyEvent
@@ -331,6 +334,33 @@ fun PlayerScreen(
                             .background(Color.Black),
                         contentAlignment = Alignment.Center
                     ) {
+                        // Top-Left Back Button for instant exit during sniffing
+                        var sniffingBackFocused by remember { mutableStateOf(false) }
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(24.dp)
+                                .size(42.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(if (sniffingBackFocused) ThemeTokens.FocusGold else Color(0xFF1E293B))
+                                .border(
+                                    width = if (sniffingBackFocused) 2.5.dp else 1.dp,
+                                    color = if (sniffingBackFocused) Color.White else Color.White.copy(alpha = 0.3f),
+                                    shape = androidx.compose.foundation.shape.CircleShape
+                                )
+                                .clickable { onBack() }
+                                .focusable()
+                                .onFocusChanged { sniffingBackFocused = it.isFocused },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = if (sniffingBackFocused) Color.Black else Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center,
@@ -470,8 +500,29 @@ fun PlayerScreen(
                         null
                     }
 
+                    val trustAllCerts = arrayOf<javax.net.ssl.TrustManager>(
+                        object : javax.net.ssl.X509TrustManager {
+                            override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>?, authType: String?) {}
+                            override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>?, authType: String?) {}
+                            override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
+                        }
+                    )
+                    val sslSocketFactory = try {
+                        val sslContext = javax.net.ssl.SSLContext.getInstance("SSL")
+                        sslContext.init(null, trustAllCerts, java.security.SecureRandom())
+                        sslContext.socketFactory
+                    } catch (_: Exception) {
+                        null
+                    }
+
                     OkHttpClient.Builder()
-                        .apply { dohDns?.let { dns(it) } }
+                        .apply {
+                            dohDns?.let { dns(it) }
+                            if (sslSocketFactory != null) {
+                                sslSocketFactory(sslSocketFactory, trustAllCerts[0] as javax.net.ssl.X509TrustManager)
+                                hostnameVerifier { _, _ -> true }
+                            }
+                        }
                         .connectTimeout(15, TimeUnit.SECONDS)
                         .readTimeout(15, TimeUnit.SECONDS)
                         .followRedirects(true)
@@ -513,11 +564,20 @@ fun PlayerScreen(
                     val dataSourceFactory = DefaultDataSource.Factory(context, okHttpDataSourceFactory)
                     val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
+                    // Tuned buffer control for 1GB RAM Android TV hardware
                     val loadControl = DefaultLoadControl.Builder()
-                        .setBufferDurationsMs(15000, 45000, 2000, 3500)
+                        .setBufferDurationsMs(8000, 22000, 1500, 2500)
                         .setPrioritizeTimeOverSizeThresholds(true)
-                        .setBackBuffer(10000, true)
+                        .setBackBuffer(5000, true)
                         .build()
+
+                    val trackSelector = DefaultTrackSelector(context).apply {
+                        setParameters(
+                            buildUponParameters()
+                                .setViewportSizeToPhysicalDisplaySize(context, true)
+                                .setPreferredVideoMimeType(MimeTypes.VIDEO_H264)
+                        )
+                    }
 
                     val audioAttributes = AudioAttributes.Builder()
                         .setUsage(C.USAGE_MEDIA)
@@ -526,6 +586,7 @@ fun PlayerScreen(
 
                     ExoPlayer.Builder(context)
                         .setMediaSourceFactory(mediaSourceFactory)
+                        .setTrackSelector(trackSelector)
                         .setLoadControl(loadControl)
                         .setAudioAttributes(audioAttributes, true)
                         .setHandleAudioBecomingNoisy(true)

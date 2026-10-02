@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.FormatListBulleted
@@ -102,6 +103,7 @@ fun PlayerControls(
     val progress = if (durationMs > 0) (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
     val displayRemaining = if (durationMs > 0) formatTime(durationMs - positionMs) else formatTime(positionMs)
 
+    val backButtonFocusRequester = remember { FocusRequester() }
     val closeButtonFocusRequester = remember { FocusRequester() }
     val rewFocusRequester = remember { FocusRequester() }
     val fwdFocusRequester = remember { FocusRequester() }
@@ -120,7 +122,7 @@ fun PlayerControls(
                 )
             )
     ) {
-        // ── 1. Top Header (Avatar + Title + Provider Badge + Close Button) ──────────
+        // ── 1. Top Header (Back Button + Avatar + Title + Provider Badge + Close Button) ──
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -129,11 +131,45 @@ fun PlayerControls(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left: Poster thumbnail + Titles
+            // Left: Back button + Poster thumbnail + Titles
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                // Dedicated Back Button
+                var backFocused by remember { mutableStateOf(false) }
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(if (backFocused) ThemeTokens.FocusGold else Color.Black.copy(alpha = 0.65f))
+                        .border(
+                            width = if (backFocused) 2.5.dp else 1.dp,
+                            color = if (backFocused) Color.White else Color.White.copy(alpha = 0.35f),
+                            shape = CircleShape
+                        )
+                        .clickable { actions.onBack() }
+                        .focusRequester(backButtonFocusRequester)
+                        .focusProperties {
+                            down = rewFocusRequester
+                            right = closeButtonFocusRequester
+                        }
+                        .focusable()
+                        .onFocusChanged { backFocused = it.isFocused }
+                        .graphicsLayer {
+                            scaleX = if (backFocused) 1.15f else 1.0f
+                            scaleY = if (backFocused) 1.15f else 1.0f
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = if (backFocused) Color.Black else Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
                 // Circular Poster Avatar
                 Box(
                     modifier = Modifier
@@ -220,7 +256,10 @@ fun PlayerControls(
                     )
                     .clickable { actions.onBack() }
                     .focusRequester(closeButtonFocusRequester)
-                    .focusProperties { down = controlsFocusRequester }
+                    .focusProperties {
+                        left = backButtonFocusRequester
+                        down = fwdFocusRequester
+                    }
                     .focusable()
                     .onFocusChanged { closeFocused = it.isFocused }
                     .graphicsLayer {
@@ -260,7 +299,7 @@ fun PlayerControls(
                     .focusRequester(rewFocusRequester)
                     .focusProperties {
                         right = controlsFocusRequester
-                        up = closeButtonFocusRequester
+                        up = backButtonFocusRequester
                     }
                     .focusable()
                     .onFocusChanged { rewFocused = it.isFocused }
@@ -302,7 +341,7 @@ fun PlayerControls(
                     .focusProperties {
                         left = rewFocusRequester
                         right = fwdFocusRequester
-                        up = closeButtonFocusRequester
+                        up = backButtonFocusRequester
                     }
                     .focusable()
                     .onFocusChanged { playFocused = it.isFocused }

@@ -86,6 +86,11 @@ class WebViewStreamExtractor(
         // Multi-Server Provider Pool (Prioritized by speed, stability, and live stream availability)
         embedSources = listOf(
             EmbedCandidate(
+                serverId = "vidsrc_sh",
+                serverName = "VidSrc Core",
+                embedUrl = if (isTv) "https://vidsrc.sh/embed/tv/$tmdbId/$s-$ep" else "https://vidsrc.sh/embed/movie/$tmdbId"
+            ),
+            EmbedCandidate(
                 serverId = "vidsrc_to",
                 serverName = "VidSrc Cinema",
                 embedUrl = if (isTv) "https://vidsrc.to/embed/tv/$tmdbId/$s/$ep" else "https://vidsrc.to/embed/movie/$tmdbId"
@@ -96,14 +101,9 @@ class WebViewStreamExtractor(
                 embedUrl = if (isTv) "https://vidsrc.in/embed/tv/$tmdbId/$s/$ep" else "https://vidsrc.in/embed/movie/$tmdbId"
             ),
             EmbedCandidate(
-                serverId = "vidsrc_pm",
-                serverName = "VidSrc Prime",
-                embedUrl = if (isTv) "https://vidsrc.pm/embed/tv/$tmdbId/$s/$ep" else "https://vidsrc.pm/embed/movie/$tmdbId"
-            ),
-            EmbedCandidate(
-                serverId = "videasy",
+                serverId = "videasy_to",
                 serverName = "VidEasy Ultra HD",
-                embedUrl = if (isTv) "https://player.videasy.net/tv/$tmdbId/$s/$ep?overlay=true" else "https://player.videasy.net/movie/$tmdbId?overlay=true"
+                embedUrl = if (isTv) "https://player.videasy.to/tv/$tmdbId/$s/$ep?overlay=true" else "https://player.videasy.to/movie/$tmdbId?overlay=true"
             ),
             EmbedCandidate(
                 serverId = "vidlink_pro",
@@ -111,9 +111,9 @@ class WebViewStreamExtractor(
                 embedUrl = if (isTv) "https://vidlink.pro/tv/$tmdbId/$s/$ep" else "https://vidlink.pro/movie/$tmdbId"
             ),
             EmbedCandidate(
-                serverId = "2embed_cc",
-                serverName = "2Embed HD Cinema",
-                embedUrl = if (isTv) "https://www.2embed.cc/embedtv/$tmdbId?s=$s&e=$ep" else "https://www.2embed.cc/embed/$tmdbId"
+                serverId = "multiembed",
+                serverName = "MultiEmbed HD",
+                embedUrl = if (isTv) "https://multiembed.mov/?video_id=$tmdbId&tmdb=1&s=$s&e=$ep" else "https://multiembed.mov/?video_id=$tmdbId&tmdb=1"
             ),
             EmbedCandidate(
                 serverId = "autoembed_to",
@@ -340,6 +340,7 @@ class WebViewStreamExtractor(
 
                 // Rewrite embed/landing pages to force autoStart & autoplay without requiring a click
                 if (lower.contains("cloudorchestranova.com") || lower.contains("landing") ||
+                    lower.contains("vsembed") || lower.contains("vidsrc") ||
                     lower.contains("/embed/tv/") || lower.contains("/embed/movie/")
                 ) {
                     val accept = request.requestHeaders?.get("Accept")?.lowercase() ?: ""
@@ -901,10 +902,12 @@ class WebViewStreamExtractor(
                 lower.contains("multiembed") || lower.contains("streamingnow") ||
                 lower.contains("vsembed") || lower.contains("cloudorchestranova") ||
                 lower.contains("autoembed") || lower.contains("jongleurjamboree") ||
+                lower.contains("nextgencloudfabric") || lower.contains("sharecloud") ||
                 lower.contains("hakunaymatata") || lower.contains("bunnycdn") || lower.contains("cloudfront") ||
                 lower.contains("fastly") || lower.contains("mcloud") ||
                 lower.contains("streamtape") || lower.contains("dood") ||
-                lower.contains("upstream") || lower.contains("videomega")
+                lower.contains("upstream") || lower.contains("videomega") ||
+                lower.contains("akamai") || lower.contains("cloudflare")
     }
 
     private fun isAdOrMiner(url: String): Boolean {
@@ -962,12 +965,14 @@ class WebViewStreamExtractor(
         val js = """
             (function() {
                 try {
-                    // 0. Neutralize Popups, Window Hijacks & Modal Dialogs
+                    // 0. Neutralize Popups, Window Hijacks, Modal Dialogs & Anti-DevTool Tamper Scripts
                     try {
                         window.open = function() { return null; };
                         window.alert = function() {};
                         window.confirm = function() { return true; };
                         window.prompt = function() { return null; };
+                        window.DisableDevtool = function() {};
+                        window.disableDevtool = function() {};
                     } catch(e) {}
 
                     // Helper to recursively extract subtitles from JSON/JS objects
